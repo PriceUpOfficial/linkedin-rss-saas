@@ -23,7 +23,7 @@ export async function GET(request: Request) {
     return redirectWithError("Parametri OAuth mancanti nel callback di LinkedIn.");
   }
 
-  const supabase = createClient();
+  const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();

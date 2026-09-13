@@ -7,7 +7,7 @@ import { env } from "@/lib/env";
 // posting the current user's id to its webhook. This app never talks to
 // RSS feeds or an LLM itself.
 export async function POST() {
-  const supabase = createClient();
+  const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();

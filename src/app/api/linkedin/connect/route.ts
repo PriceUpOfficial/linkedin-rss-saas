@@ -7,7 +7,7 @@ import { buildLinkedInAuthorizationUrl } from "@/lib/linkedin";
 // stash it (tied to the logged-in user) in oauth_states, and redirect the
 // browser to LinkedIn's authorization screen.
 export async function GET(request: Request) {
-  const supabase = createClient();
+  const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();

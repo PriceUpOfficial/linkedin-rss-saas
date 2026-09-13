@@ -79,14 +79,22 @@ supabase/migrations/           schema SQL (RLS inclusa)
 
 ## Nota sulla versione di Next.js
 
-Il progetto usa la serie **Next.js 14** (`14.2.35`, l'ultima patch disponibile
-su questa major) come richiesto. Ad agosto 2026 Vercel ha rilasciato fix per
-due CVE critiche (RCE nell'Image Optimization API con file AVIF, RCE su
-Windows) solo per le serie 15.5.24+ e 16.3.3+: sulla 14.x non esiste una
-patch. Questa app non usa `next/image` né la route `/next/image`, quindi la
-superficie d'attacco specifica (Image Optimization API) non è esposta; se in
-futuro si introduce `next/image` o si serve pubblicamente questa build,
-valutare la migrazione a Next.js 15/16.
+Il progetto è stato aggiornato da Next.js 14 a **Next.js 15** (`15.5.25`,
+l'ultima patch stabile), che include le fix per le CVE critiche rilasciate
+ad agosto 2026 (RCE nell'Image Optimization API con file AVIF, RCE su
+Windows) — sulla serie 14.x non esiste una patch per queste.
+
+Breaking change dell'App Router sistemati durante la migrazione:
+- `cookies()` (in `src/lib/supabase/server.ts`) è ora asincrono: `createClient()`
+  lato server è diventato `async` e ogni chiamata nel codice usa
+  `await createClient()`.
+- `searchParams` nelle pagine (`/login`, `/dashboard/linkedin`) è ora una
+  `Promise` invece di un oggetto sincrono: entrambe le pagine fanno
+  `await searchParams` prima di leggerne i campi.
+- Il progetto non ha route dinamiche (`[id]`), quindi non è stato necessario
+  aggiornare `params`.
+- React resta sulla 18.3 (Next 15 supporta sia React 18 che 19 in App
+  Router); nessuna modifica necessaria lato componenti per questo.
 
 ## Note di sicurezza
 

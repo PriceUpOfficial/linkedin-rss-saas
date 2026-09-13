@@ -5,15 +5,16 @@ import LoginForm from "./login-form";
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: { next?: string };
+  searchParams: Promise<{ next?: string }>;
 }) {
-  const supabase = createClient();
+  const { next } = await searchParams;
+  const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
   if (user) {
-    redirect(searchParams.next ?? "/dashboard/posts");
+    redirect(next ?? "/dashboard/posts");
   }
 
   return (
@@ -25,7 +26,7 @@ export default async function LoginPage({
             Ti invieremo un link di accesso via email, senza password.
           </p>
         </div>
-        <LoginForm redirectTo={searchParams.next ?? "/dashboard/posts"} />
+        <LoginForm redirectTo={next ?? "/dashboard/posts"} />
       </div>
     </div>
   );

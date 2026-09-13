@@ -2,7 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { addFeed, deleteFeed, toggleFeed } from "./actions";
 
 export default async function FeedsPage() {
-  const supabase = createClient();
+  const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();

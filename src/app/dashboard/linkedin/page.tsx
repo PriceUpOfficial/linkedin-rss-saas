@@ -4,9 +4,10 @@ import { disconnectLinkedIn } from "./actions";
 export default async function LinkedInPage({
   searchParams,
 }: {
-  searchParams: { connected?: string; error?: string };
+  searchParams: Promise<{ connected?: string; error?: string }>;
 }) {
-  const supabase = createClient();
+  const { connected, error } = await searchParams;
+  const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -29,10 +30,10 @@ export default async function LinkedInPage({
         </p>
       </div>
 
-      {searchParams.error && (
-        <p className="rounded-md bg-red-50 p-3 text-sm text-red-700">{searchParams.error}</p>
+      {error && (
+        <p className="rounded-md bg-red-50 p-3 text-sm text-red-700">{error}</p>
       )}
-      {searchParams.connected && (
+      {connected && (
         <p className="rounded-md bg-green-50 p-3 text-sm text-green-700">
           Account LinkedIn collegato con successo.
         </p>
