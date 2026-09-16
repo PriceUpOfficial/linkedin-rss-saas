@@ -1,1 +1,114 @@
 # linkedin-rss-saas
+
+App Next.js 14 (App Router) + Supabase + Tailwind: gli utenti accedono via email,
+gestiscono una lista di feed RSS, collegano LinkedIn con un flusso OAuth 2.0
+personalizzato (scope `openid profile w_member_social`) e approvano/scartano i
+post generati da un workflow n8n esterno.
+
+## Architettura
+
+- **Auth**: Supabase Auth, accesso via magic link email (nessuna password).
+- **Database**: Supabase Postgres, schema in `supabase/migrations/`, RLS attiva
+  su tutte le tabelle.
+- **Fetch RSS + generazione testo**: gestiti interamente da un workflow **n8n
+  esterno**, che legge/scrive su Supabase con la service role key. Questa app
+  non fa parsing di feed né chiamate LLM: si limita a chiamare il webhook n8n
+  (`N8N_GENERATE_WEBHOOK_URL`) quando l'utente clicca "Genera ora".
+- **LinkedIn**: OAuth 2.0 custom (non il provider LinkedIn integrato in
+  Supabase, che non permette di richiedere lo scope `w_member_social`).
+  Vedi `src/lib/linkedin.ts` e `src/app/api/linkedin/*`.
+- **Approvazione post**: "Approva" pubblica subito il post su LinkedIn
+  (`POST /rest/posts`, con upload preventivo dell'eventuale immagine via
+  `POST /rest/images`) usando il token salvato per l'utente, letto
+  esclusivamente server-side. Esito: `posted` + `linkedin_post_urn`, oppure
+  `failed` + `error_message`. "Scarta" imposta `status = 'rejected'`.
+
+## Struttura del progetto
+
+```
+src/
+  app/
+    login/                    pagina di login (magic link)
+    auth/callback/route.ts    scambio codice -> sessione Supabase
+    api/linkedin/connect/     step 1 OAuth LinkedIn (redirect ad authorize)
+    api/linkedin/callback/    step 2 OAuth LinkedIn (scambio code -> token)
+    api/generate/route.ts     chiama il webhook n8n
+    dashboard/
+      feeds/                  CRUD feed RSS
+      linkedin/               stato connessione LinkedIn
+      posts/                  lista post generati, Genera ora / Approva / Scarta
+      settings/               tono, lingua, post/giorno, istruzioni custom
+  lib/
+    supabase/{server,client,admin}.ts
+    linkedin.ts                helper OAuth + pubblicazione post
+    database.types.ts          tipi TypeScript per le tabelle
+supabase/migrations/           schema SQL (RLS inclusa)
+n8n/                            workflow n8n adattato (fetch RSS + generazione, no publish diretto) e sua guida
+```
+
+## Setup
+
+1. **Supabase**
+   - Crea un progetto Supabase.
+   - Applica le migration in ordine: `supabase db push` (con Supabase CLI
+     collegata al progetto) oppure incolla il contenuto dei file in
+     `supabase/migrations/` (in ordine di data) nello SQL Editor.
+   - In *Authentication → URL Configuration* aggiungi come Redirect URL:
+     `http://localhost:3000/auth/callback` (e l'equivalente in produzione).
+
+2. **App LinkedIn**
+   - Crea un'app su [LinkedIn Developers](https://www.linkedin.com/developers/apps).
+   - Prodotti richiesti: *Sign In with LinkedIn using OpenID Connect* e
+     *Share on LinkedIn* (per lo scope `w_member_social`).
+   - Redirect URL autorizzato: deve combaciare esattamente con
+     `LINKEDIN_REDIRECT_URI` (es. `http://localhost:3000/api/linkedin/callback`).
+
+3. **n8n**
+   - Vedi `n8n/README.md` e `n8n/rss-to-linkedin-generate.json`: workflow
+     pronto da importare che legge `rss_feeds`/`generation_settings` per
+     utente, dedup contro `feed_items`, genera testo + immagine e scrive in
+     `generated_posts` con `status='pending'` (nessuna pubblicazione diretta
+     su LinkedIn). Espone un webhook (`Webhook: Genera Ora`) da collegare a
+     `N8N_GENERATE_WEBHOOK_URL`, oltre a uno Schedule Trigger per la
+     generazione automatica su tutti gli utenti con feed attivi.
+
+4. **Variabili d'ambiente**
+
+   Copia `.env.example` in `.env.local` e compila tutti i valori.
+
+5. **Installazione e avvio**
+
+   ```bash
+   npm install
+   npm run dev
+   ```
+
+## Nota sulla versione di Next.js
+
+Il progetto è stato aggiornato da Next.js 14 a **Next.js 15** (`15.5.25`,
+l'ultima patch stabile), che include le fix per le CVE critiche rilasciate
+ad agosto 2026 (RCE nell'Image Optimization API con file AVIF, RCE su
+Windows) — sulla serie 14.x non esiste una patch per queste.
+
+Breaking change dell'App Router sistemati durante la migrazione:
+- `cookies()` (in `src/lib/supabase/server.ts`) è ora asincrono: `createClient()`
+  lato server è diventato `async` e ogni chiamata nel codice usa
+  `await createClient()`.
+- `searchParams` nelle pagine (`/login`, `/dashboard/linkedin`) è ora una
+  `Promise` invece di un oggetto sincrono: entrambe le pagine fanno
+  `await searchParams` prima di leggerne i campi.
+- Il progetto non ha route dinamiche (`[id]`), quindi non è stato necessario
+  aggiornare `params`.
+- React resta sulla 18.3 (Next 15 supporta sia React 18 che 19 in App
+  Router); nessuna modifica necessaria lato componenti per questo.
+
+## Note di sicurezza
+
+- Il service role key non viene mai usato lato client; l'unico client
+  browser (`src/lib/supabase/client.ts`) usa esclusivamente l'anon key.
+- I token LinkedIn (`linkedin_accounts.access_token` / `refresh_token`)
+  vengono letti solo in Server Actions / Route Handler, mai esposti al
+  browser.
+- Ogni tabella ha RLS attiva; le policy di update usano sia `USING` che
+  `WITH CHECK (auth.uid() = user_id)` per impedire il cambio di proprietario
+  di una riga durante un update.
