@@ -1,0 +1,909 @@
+{
+  "name": "Post LinkedIn Pietro Tommasi (Supabase)",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 8
+            },
+            {
+              "triggerAtHour": 11
+            },
+            {
+              "triggerAtHour": 12
+            },
+            {
+              "triggerAtHour": 14
+            },
+            {
+              "triggerAtHour": 18
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -13600,
+        -80
+      ],
+      "id": "fe94a980-d727-4c0b-a407-a032672b95d8",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{$env.SUPABASE_URL}}/rest/v1/rss_feeds?select=user_id&is_active=eq.true",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{$env.SUPABASE_SERVICE_ROLE_KEY}}"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$env.SUPABASE_SERVICE_ROLE_KEY}}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -13360,
+        -80
+      ],
+      "id": "n2-get-feeds-schedule",
+      "name": "Get Feeds For Schedule"
+    },
+    {
+      "parameters": {
+        "jsCode": "const response = $input.first().json;\nconst rows = Array.isArray(response) ? response : (response.data ?? [response]);\nconst userIds = [...new Set(rows.map(r => r.user_id).filter(Boolean))];\nreturn userIds.map(user_id => ({ json: { user_id } }));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -13120,
+        -80
+      ],
+      "id": "n3-dedupe-users",
+      "name": "Dedupe User IDs"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "generate-linkedin-post",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -13600,
+        160
+      ],
+      "id": "n4-webhook",
+      "name": "Webhook: Genera Ora",
+      "webhookId": "b6e3f9b0-4a29-4b4a-9a3e-5c9d5f0d2b11"
+    },
+    {
+      "parameters": {
+        "mode": "manual",
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a1",
+              "name": "user_id",
+              "type": "string",
+              "value": "={{$json.body.user_id}}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -13360,
+        160
+      ],
+      "id": "n5-normalize-webhook",
+      "name": "Normalize Webhook Input"
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{$env.SUPABASE_URL}}/rest/v1/generation_settings?select=*&user_id=eq.{{$json.user_id}}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{$env.SUPABASE_SERVICE_ROLE_KEY}}"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$env.SUPABASE_SERVICE_ROLE_KEY}}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -13120,
+        160
+      ],
+      "id": "n6-get-settings",
+      "name": "Get Generation Settings"
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{$env.SUPABASE_URL}}/rest/v1/rss_feeds?select=id,url,user_id&user_id=eq.{{$json.user_id}}&is_active=eq.true",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{$env.SUPABASE_SERVICE_ROLE_KEY}}"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$env.SUPABASE_SERVICE_ROLE_KEY}}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -13120,
+        320
+      ],
+      "id": "n7-get-feeds",
+      "name": "Get Active Feeds"
+    },
+    {
+      "parameters": {
+        "jsCode": "const response = $input.first().json;\nconst rows = Array.isArray(response) ? response : (response.data ?? [response]);\nreturn rows.map(row => ({ json: row }));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -12880,
+        320
+      ],
+      "id": "n8-split-feeds",
+      "name": "Split Feeds"
+    },
+    {
+      "parameters": {
+        "url": "={{$json.url}}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1.2,
+      "position": [
+        -12640,
+        320
+      ],
+      "id": "n9-rss-read",
+      "name": "RSS Feed Read"
+    },
+    {
+      "parameters": {
+        "mode": "manual",
+        "includeOtherFields": true,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "b1",
+              "name": "feed_id",
+              "type": "string",
+              "value": "={{$('Split Feeds').item.json.id}}"
+            },
+            {
+              "id": "b2",
+              "name": "feed_url",
+              "type": "string",
+              "value": "={{$('Split Feeds').item.json.url}}"
+            },
+            {
+              "id": "b3",
+              "name": "user_id",
+              "type": "string",
+              "value": "={{$('Split Feeds').item.json.user_id}}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -12400,
+        320
+      ],
+      "id": "n10-tag-feed",
+      "name": "Tag Feed Source"
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{$env.SUPABASE_URL}}/rest/v1/feed_items?select=guid&user_id=eq.{{$json.user_id}}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{$env.SUPABASE_SERVICE_ROLE_KEY}}"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$env.SUPABASE_SERVICE_ROLE_KEY}}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -13120,
+        480
+      ],
+      "id": "n11-get-existing",
+      "name": "Get Existing Guids"
+    },
+    {
+      "parameters": {
+        "jsCode": "const rawExisting = $('Get Existing Guids').all().map(i => i.json);\nlet existingRows = rawExisting;\nif (rawExisting.length === 1 && Array.isArray(rawExisting[0])) {\n  existingRows = rawExisting[0];\n} else if (rawExisting.length === 1 && rawExisting[0] && rawExisting[0].data) {\n  existingRows = rawExisting[0].data;\n}\nconst existing = new Set(existingRows.map(r => r.guid).filter(Boolean));\n\nconst keywords = ['hotel', 'travel', 'revenue', 'strategy', 'trend', 'ai', 'stratup', 'tip', 'price', 'pricing', 'ota', 'loyalty', 'experience', 'expedia', 'booking.com', 'airbnb'];\n\nconst candidates = $input.all()\n  .map(item => ({ ...item.json, guid: item.json.guid || item.json.link }))\n  .filter(a => a.guid && !existing.has(a.guid));\n\nconst scored = candidates.map(a => {\n  const content = ((a.title || '') + ' ' + (a.contentSnippet || '')).toLowerCase();\n  let score = 0;\n  keywords.forEach(word => { if (content.includes(word)) score += 1; });\n  return { ...a, score };\n});\n\nscored.sort((a, b) => b.score - a.score);\n\nreturn scored.length > 0 ? [{ json: scored[0] }] : [];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -12160,
+        320
+      ],
+      "id": "n12-score-filter",
+      "name": "Score And Filter New Articles"
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "gpt-4o",
+          "mode": "list",
+          "cachedResultName": "GPT-4O"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "Sei un giornalista esperto di viaggi con 25 anni di esperienza. Riscrivi l’articolo fornito in modo professionale, autorevole, coinvolgente e chiaro, aggiungendo un’introduzione accattivante e una conclusione incisiva. Inserisci sempre alla fine una sezione \"Fonti\" con il link originale.",
+              "role": "system"
+            },
+            {
+              "content": "=Titolo: {{$json[\"title\"]}}\nAbstract: {{$json[\"contentSnippet\"]}}\nLink: {{$json[\"link\"]}}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 1.8,
+      "position": [
+        -11920,
+        220
+      ],
+      "id": "e4ba49bd-cd09-4716-a1eb-da90da1caeff",
+      "name": "Message a model",
+      "credentials": {
+        "openAiApi": {
+          "id": "G8IcYwgPh0IQGg4b",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "gpt-4",
+          "mode": "list",
+          "cachedResultName": "GPT-4"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "=Scrivi un post per LinkedIn **di almeno 500 caratteri** ispirandoti all’articolo seguente.\n\nNON scrivere un riassunto.\nNON usare i due punti (es: “Trend:”, “Conclusione:”).\nNON dividere in sezioni.\nNON usare toni scolastici o spiegoni.\nNON sembrare un'intelligenza artificiale.\nNON fare sempre riferimento nel testo del post ai 25 anni di esperienza.\nNON commettere errori grammaticali.\nNON usare mai il seguente simbolo -\n\nScrivi in italiano naturale, come se fossi Pietro Tommasi, esperto nel settore travel e hospitality da 25 anni: comunicativo, brillante, autorevole ma mai arrogante.\n\n✅ Il titolo del post deve essere un **hook potente**:\n- titolo in maiuscolo,\n- 2 emoticon pertinenti al titolo che lo racchiudano\n- max 6 parole,\n- evocativo, non didascalico.\n\n✅ Il corpo del post deve:\n- essere discorsivo e **fluido**, come una chiacchierata ispirata;\n- il contenuto del post deve essere chiaro, ossia il lettore dive capire qual'è la notizia o di cosa sta parlando il post\n- alternare frasi brevi e spazi visivi ben dosati;\n- esprimere una **riflessione** autentica, non una descrizione;\n- usare **punteggiatura corretta** (virgole, punti, punto interrogativo);\n- usare inglesismi **solo quando davvero utili o comunemente usati nel settore**;\n- inserire **emoticon** anche nel testo per dare ritmo, enfasi o tono emotivo;\n\n✅ Se nel contenuto è citata:\n- un’azienda → aggiungi `@nomeazienda ` o `#nomeazienda `\n- una persona reale → aggiungi `@nomepersona ` (formato LinkedIn)\n\n✅ Chiudi con:\n- una **domanda implicita**, una suggestione, o una citazione stimolante (no call to action banale)\nA questo punto inserisci sempre il seguente testo: Vi leggo volentieri nei commenti.\n\nPietro Tommasi\n\nSe questo contenuto ti ha fatto riflettere:\n🔖 Salvalo\n👍 Consiglialo\n💬 Commenta per partecipare alla community.\n\n👉 Infine visita il mio profilo e attiva la campanella 🛎️ (tutte) per non perdere i prossimi contenuti e confronti sul mondo dell’ospitalità\n- 7 hashtag specifici e ben scelti (no #travel generico) non andare a capo\n- il **link all’articolo originale**\nNon fare errori di grammatica e punteggiatura. se poni una domanda devi inserire alla fine il punto interrogativo.\n\nOra scrivi il post.",
+              "role": "system"
+            },
+            {
+              "content": "={{ $json.message.content }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 1.8,
+      "position": [
+        -11680,
+        220
+      ],
+      "id": "e049138d-190e-4208-9f6b-8fc5d9e87b08",
+      "name": "Message a model1",
+      "credentials": {
+        "openAiApi": {
+          "id": "G8IcYwgPh0IQGg4b",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "gpt-4o"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "=Articolo: {{ $json.title }}\nContenuto: {{ $json.contentSnippet }}"
+            },
+            {
+              "content": "Sei un esperto di visual design per social media. Crea un prompt dettagliato per che generi un'immagine professionale, accattivante, realistica che sembri un vera fotografia per un post LinkedIn sul settore travel e hospitality. Il prompt deve descrivere uno stile moderno, pulito, professionale. La fotografia generata deve riassumere il senso semantico dell'articolo selezionato nel precedente nodo e deve avere sempre un testo in italiano  non in inglese che richiami il titolo ed inizio articolo ( questo serve per far visualizzare il post almeno 3 secondi ed aumentare il ranking) scritta nera su fondo bianco trasparente al 70% posizionata in modo tale che lasci visibile le caratteristiche principali della foto, NON deve avere il simbolo dell'immagine creata con l'Ai. DEVE essere il più realistica possibile con la finalità di creare maggior engagement nella community di linkedin.",
+              "role": "system"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "b984d47a-2063-4cad-ab92-eb6b53830054",
+      "name": "Generate Image Prompt",
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 1.8,
+      "position": [
+        -11920,
+        420
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "G8IcYwgPh0IQGg4b",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "image",
+        "model": "gpt-image-1",
+        "prompt": "={{ $json.message.content }}",
+        "options": {
+          "size": "1024x1024"
+        }
+      },
+      "id": "1217dda0-fe09-469b-aca3-c9a48e9e3320",
+      "name": "Generate Image",
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 1.8,
+      "position": [
+        -11680,
+        420
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "G8IcYwgPh0IQGg4b",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "crop",
+        "width": 994,
+        "height": 994,
+        "positionX": 30,
+        "positionY": 30,
+        "options": {}
+      },
+      "id": "c5769612-f076-45f3-bbf8-98b179464c5b",
+      "name": "Crop Watermark Area",
+      "type": "n8n-nodes-base.editImage",
+      "typeVersion": 1,
+      "position": [
+        -11440,
+        420
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.SUPABASE_URL}}/storage/v1/object/post-images/{{$('Score And Filter New Articles').item.json.user_id}}/{{$now.toMillis()}}.png",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{$env.SUPABASE_SERVICE_ROLE_KEY}}"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$env.SUPABASE_SERVICE_ROLE_KEY}}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "image/png"
+            },
+            {
+              "name": "x-upsert",
+              "value": "true"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "binaryData",
+        "inputDataFieldName": "data",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -11200,
+        420
+      ],
+      "id": "n17-upload-image",
+      "name": "Upload Image To Storage"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineAll",
+        "options": {}
+      },
+      "id": "dcd4267f-1dbc-4028-8382-04f108ab2e93",
+      "name": "Merge Text and Image",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        -10960,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const merged = $input.first().json;\nconst article = $('Score And Filter New Articles').item.json;\nconst imageKey = merged.Key || merged.path || (merged.data && merged.data.path);\n\nreturn [{\n  json: {\n    userId: article.user_id,\n    feedId: article.feed_id,\n    guid: article.guid,\n    title: article.title || null,\n    link: article.link || null,\n    summary: article.contentSnippet || null,\n    publishedAt: article.isoDate || null,\n    postText: merged.message.content,\n    imageUrl: imageKey ? `${$env.SUPABASE_URL}/storage/v1/object/public/${imageKey}` : null,\n  },\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -10720,
+        320
+      ],
+      "id": "n20-build-payload",
+      "name": "Build Insert Payload"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.SUPABASE_URL}}/rest/v1/feed_items",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{$env.SUPABASE_SERVICE_ROLE_KEY}}"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$env.SUPABASE_SERVICE_ROLE_KEY}}"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=representation,resolution=merge-duplicates"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {},
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"feed_id\": {{JSON.stringify($json.feedId)}},\n  \"user_id\": {{JSON.stringify($json.userId)}},\n  \"guid\": {{JSON.stringify($json.guid)}},\n  \"title\": {{JSON.stringify($json.title)}},\n  \"link\": {{JSON.stringify($json.link)}},\n  \"summary\": {{JSON.stringify($json.summary)}},\n  \"published_at\": {{JSON.stringify($json.publishedAt)}}\n}"
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -10480,
+        320
+      ],
+      "id": "n21-insert-feed-item",
+      "name": "Insert Feed Item"
+    },
+    {
+      "parameters": {
+        "jsCode": "const response = $input.first().json;\nconst rows = Array.isArray(response) ? response : (response.data ?? [response]);\nreturn [{ json: { ...$('Build Insert Payload').item.json, feedItemId: rows[0]?.id ?? null } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -10240,
+        320
+      ],
+      "id": "n22-extract-feed-item-id",
+      "name": "Extract Feed Item Id"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.SUPABASE_URL}}/rest/v1/generated_posts",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{$env.SUPABASE_SERVICE_ROLE_KEY}}"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$env.SUPABASE_SERVICE_ROLE_KEY}}"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=representation"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {},
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"user_id\": {{JSON.stringify($json.userId)}},\n  \"feed_item_id\": {{JSON.stringify($json.feedItemId)}},\n  \"content\": {{JSON.stringify($json.postText)}},\n  \"image_url\": {{JSON.stringify($json.imageUrl)}},\n  \"status\": \"pending\"\n}"
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -10000,
+        320
+      ],
+      "id": "n23-insert-generated-post",
+      "name": "Insert Generated Post"
+    },
+    {
+      "parameters": {
+        "content": "## Setup richiesto prima di attivare\n\n- Variabili **SUPABASE_URL** e **SUPABASE_SERVICE_ROLE_KEY** sull'istanza n8n\n  (self-hosted: env vars, poi `$env.NOME`; n8n Cloud: sezione Variables,\n  poi sostituisci `$env.` con `$vars.` in tutti i nodi HTTP Request).\n- Credenziale OpenAI: riusa quella già collegata.\n- Bucket Storage `post-images`: creato dalla migration\n  `20260916000000_add_post_images.sql`.\n- LinkedIn NON serve più qui: la pubblicazione avviene dall'app\n  Next.js solo dopo che l'utente clicca *Approva*.",
+        "height": 260,
+        "width": 640,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -13640,
+        -320
+      ],
+      "id": "sn1",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "content": "## Non ancora usato\nTono/lingua/istruzioni custom sono già letti da\nSupabase ma non ancora iniettati nel system\nprompt di 'Message a model1'. Prossimo passo.",
+        "height": 160,
+        "width": 260
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -13160,
+        -20
+      ],
+      "id": "sn2",
+      "name": "Sticky Note1"
+    },
+    {
+      "parameters": {
+        "content": "## Trigger manuale\nRiceve POST {user_id} dal bottone\n'Genera ora' dell'app. Copia l'URL di\nproduzione in N8N_GENERATE_WEBHOOK_URL.",
+        "height": 160,
+        "width": 260
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -13640,
+        260
+      ],
+      "id": "sn3",
+      "name": "Sticky Note2"
+    },
+    {
+      "parameters": {
+        "content": "## Da verificare nell'editor (non testato live)\n\n- Tutti i nodi HTTP Request verso Supabase: URL, header, $env vs $vars.\n- 'Tag Feed Source': si affida al pairedItem di RSS Feed Read per\n  recuperare feed_id/url/user_id da 'Split Feeds'.\n- 'Merge Text and Image': indice 0 = testo, indice 1 = upload immagine.\n- 'Upload Image To Storage': il nome del campo binario in ingresso da\n  'Crop Watermark Area' deve essere 'data' (default di Edit Image).",
+        "height": 200,
+        "width": 700,
+        "color": 3
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -10480,
+        520
+      ],
+      "id": "sn4",
+      "name": "Sticky Note3"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get Feeds For Schedule",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Feeds For Schedule": {
+      "main": [
+        [
+          {
+            "node": "Dedupe User IDs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Dedupe User IDs": {
+      "main": [
+        [
+          {
+            "node": "Get Generation Settings",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Get Active Feeds",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Get Existing Guids",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook: Genera Ora": {
+      "main": [
+        [
+          {
+            "node": "Normalize Webhook Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Webhook Input": {
+      "main": [
+        [
+          {
+            "node": "Get Generation Settings",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Get Active Feeds",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Get Existing Guids",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Active Feeds": {
+      "main": [
+        [
+          {
+            "node": "Split Feeds",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Feeds": {
+      "main": [
+        [
+          {
+            "node": "RSS Feed Read",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "RSS Feed Read": {
+      "main": [
+        [
+          {
+            "node": "Tag Feed Source",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tag Feed Source": {
+      "main": [
+        [
+          {
+            "node": "Score And Filter New Articles",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Score And Filter New Articles": {
+      "main": [
+        [
+          {
+            "node": "Message a model",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Generate Image Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Message a model": {
+      "main": [
+        [
+          {
+            "node": "Message a model1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Image Prompt": {
+      "main": [
+        [
+          {
+            "node": "Generate Image",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Image": {
+      "main": [
+        [
+          {
+            "node": "Crop Watermark Area",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Crop Watermark Area": {
+      "main": [
+        [
+          {
+            "node": "Upload Image To Storage",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Message a model1": {
+      "main": [
+        [
+          {
+            "node": "Merge Text and Image",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload Image To Storage": {
+      "main": [
+        [
+          {
+            "node": "Merge Text and Image",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge Text and Image": {
+      "main": [
+        [
+          {
+            "node": "Build Insert Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Insert Payload": {
+      "main": [
+        [
+          {
+            "node": "Insert Feed Item",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert Feed Item": {
+      "main": [
+        [
+          {
+            "node": "Extract Feed Item Id",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Feed Item Id": {
+      "main": [
+        [
+          {
+            "node": "Insert Generated Post",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "versionId": "00000000-0000-0000-0000-000000000001",
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "nodeGroups": [],
+  "id": "quJ3Aj7j65iDKu0h",
+  "tags": []
+}

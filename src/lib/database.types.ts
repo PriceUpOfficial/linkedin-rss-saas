@@ -101,6 +101,7 @@ export interface Database {
           user_id: string;
           feed_item_id: string | null;
           content: string;
+          image_url: string | null;
           status: PostStatus;
           linkedin_post_urn: string | null;
           error_message: string | null;

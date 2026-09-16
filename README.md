@@ -18,7 +18,8 @@ post generati da un workflow n8n esterno.
   Supabase, che non permette di richiedere lo scope `w_member_social`).
   Vedi `src/lib/linkedin.ts` e `src/app/api/linkedin/*`.
 - **Approvazione post**: "Approva" pubblica subito il post su LinkedIn
-  (`POST /rest/posts`) usando il token salvato per l'utente, letto
+  (`POST /rest/posts`, con upload preventivo dell'eventuale immagine via
+  `POST /rest/images`) usando il token salvato per l'utente, letto
   esclusivamente server-side. Esito: `posted` + `linkedin_post_urn`, oppure
   `failed` + `error_message`. "Scarta" imposta `status = 'rejected'`.
 
@@ -42,15 +43,16 @@ src/
     linkedin.ts                helper OAuth + pubblicazione post
     database.types.ts          tipi TypeScript per le tabelle
 supabase/migrations/           schema SQL (RLS inclusa)
+n8n/                            workflow n8n adattato (fetch RSS + generazione, no publish diretto) e sua guida
 ```
 
 ## Setup
 
 1. **Supabase**
    - Crea un progetto Supabase.
-   - Applica la migration: `supabase db push` (con Supabase CLI collegata al
-     progetto) oppure incolla il contenuto di
-     `supabase/migrations/20260913000000_init_schema.sql` nello SQL Editor.
+   - Applica le migration in ordine: `supabase db push` (con Supabase CLI
+     collegata al progetto) oppure incolla il contenuto dei file in
+     `supabase/migrations/` (in ordine di data) nello SQL Editor.
    - In *Authentication → URL Configuration* aggiungi come Redirect URL:
      `http://localhost:3000/auth/callback` (e l'equivalente in produzione).
 
@@ -62,9 +64,13 @@ supabase/migrations/           schema SQL (RLS inclusa)
      `LINKEDIN_REDIRECT_URI` (es. `http://localhost:3000/api/linkedin/callback`).
 
 3. **n8n**
-   - Il workflow deve esporre un webhook che accetta `POST { user_id }` e, in
-     modo asincrono, scrive righe in `feed_items` e `generated_posts` per
-     quell'utente usando la service role key di Supabase.
+   - Vedi `n8n/README.md` e `n8n/rss-to-linkedin-generate.json`: workflow
+     pronto da importare che legge `rss_feeds`/`generation_settings` per
+     utente, dedup contro `feed_items`, genera testo + immagine e scrive in
+     `generated_posts` con `status='pending'` (nessuna pubblicazione diretta
+     su LinkedIn). Espone un webhook (`Webhook: Genera Ora`) da collegare a
+     `N8N_GENERATE_WEBHOOK_URL`, oltre a uno Schedule Trigger per la
+     generazione automatica su tutti gli utenti con feed attivi.
 
 4. **Variabili d'ambiente**
 

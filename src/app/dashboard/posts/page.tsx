@@ -26,7 +26,7 @@ export default async function PostsPage() {
 
   const { data: posts } = await supabase
     .from("generated_posts")
-    .select("id, content, status, error_message, linkedin_post_urn, created_at, posted_at")
+    .select("id, content, image_url, status, error_message, linkedin_post_urn, created_at, posted_at")
     .eq("user_id", user!.id)
     .order("created_at", { ascending: false });
 
@@ -59,6 +59,15 @@ export default async function PostsPage() {
             </div>
 
             <p className="mt-3 whitespace-pre-wrap text-sm text-gray-800">{post.content}</p>
+
+            {post.image_url && (
+              // eslint-disable-next-line @next/next/no-img-element -- remote image from Supabase Storage, no next/image domain config needed
+              <img
+                src={post.image_url}
+                alt=""
+                className="mt-3 max-h-80 w-full rounded-md object-cover"
+              />
+            )}
 
             {post.status === "posted" && post.linkedin_post_urn && (
               <p className="mt-2 text-xs text-gray-500">URN LinkedIn: {post.linkedin_post_urn}</p>

@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { publishLinkedInPost } from "@/lib/linkedin";
+import { publishLinkedInPost, uploadLinkedInImage } from "@/lib/linkedin";
 
 async function requireUser() {
   const supabase = await createClient();
@@ -30,7 +30,7 @@ export async function approvePost(formData: FormData) {
 
   const { data: post } = await supabase
     .from("generated_posts")
-    .select("id, content, status")
+    .select("id, content, image_url, status")
     .eq("id", id)
     .eq("user_id", user.id)
     .maybeSingle();
@@ -69,10 +69,20 @@ export async function approvePost(formData: FormData) {
   }
 
   try {
+    let imageUrn: string | null = null;
+    if (post.image_url) {
+      imageUrn = await uploadLinkedInImage({
+        accessToken: account.access_token,
+        authorSub: account.linkedin_sub,
+        imageUrl: post.image_url,
+      });
+    }
+
     const urn = await publishLinkedInPost({
       accessToken: account.access_token,
       authorSub: account.linkedin_sub,
       text: post.content,
+      imageUrn,
     });
 
     await supabase
