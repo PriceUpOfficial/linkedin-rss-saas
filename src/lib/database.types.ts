@@ -144,6 +144,8 @@ export interface Database {
           language: string;
           posts_per_day: number;
           custom_instructions: string | null;
+          schedule_hours: number[];
+          generate_image: boolean;
           created_at: string;
           updated_at: string;
         };

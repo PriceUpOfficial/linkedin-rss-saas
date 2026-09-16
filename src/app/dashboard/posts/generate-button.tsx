@@ -23,7 +23,7 @@ export default function GenerateButton() {
       }
 
       setStatus("done");
-      setMessage("Generazione avviata: i nuovi post appariranno qui a breve.");
+      setMessage(data.message ?? "Fatto.");
       router.refresh();
     } catch {
       setStatus("error");
@@ -38,7 +38,7 @@ export default function GenerateButton() {
         disabled={status === "loading"}
         className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-60"
       >
-        {status === "loading" ? "Avvio in corso…" : "Genera ora"}
+        {status === "loading" ? "Generazione in corso… (fino a 1 minuto)" : "Genera ora"}
       </button>
       {message && (
         <p className={`text-sm ${status === "error" ? "text-red-600" : "text-gray-600"}`}>

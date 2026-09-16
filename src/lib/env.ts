@@ -31,7 +31,11 @@ export const env = {
   get linkedinRedirectUri() {
     return required("LINKEDIN_REDIRECT_URI", process.env.LINKEDIN_REDIRECT_URI);
   },
-  get n8nGenerateWebhookUrl() {
-    return required("N8N_GENERATE_WEBHOOK_URL", process.env.N8N_GENERATE_WEBHOOK_URL);
+  get openaiApiKey() {
+    return required("OPENAI_API_KEY", process.env.OPENAI_API_KEY);
+  },
+  /** Shared secret checked on /api/cron/generate so it can't be triggered by anyone who finds the URL. */
+  get cronSecret() {
+    return required("CRON_SECRET", process.env.CRON_SECRET);
   },
 };

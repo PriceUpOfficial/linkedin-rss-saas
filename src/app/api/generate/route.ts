@@ -1,11 +1,14 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { env } from "@/lib/env";
+import { generatePostForUser } from "@/lib/generatePost";
 
-// Called by the "Genera ora" button. Triggers the external n8n workflow
-// (which reads/writes Supabase directly with the service role key) by
-// posting the current user's id to its webhook. This app never talks to
-// RSS feeds or an LLM itself.
+// Image generation can take a while; give this route the most headroom the
+// hosting plan allows (60s on Vercel Hobby, more on paid plans).
+export const maxDuration = 60;
+
+// Called by the "Genera ora" button. Runs the whole pipeline in-process:
+// fetch this user's active RSS feeds, pick the best new article, write and
+// (optionally) illustrate the post with OpenAI, save it as 'pending'.
 export async function POST() {
   const supabase = await createClient();
   const {
@@ -17,24 +20,21 @@ export async function POST() {
   }
 
   try {
-    const res = await fetch(env.n8nGenerateWebhookUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ user_id: user.id }),
-      cache: "no-store",
-    });
+    const result = await generatePostForUser(user.id);
 
-    if (!res.ok) {
-      const text = await res.text();
-      return NextResponse.json(
-        { error: `Il workflow n8n ha risposto con errore (${res.status}): ${text}` },
-        { status: 502 }
-      );
+    switch (result.status) {
+      case "created":
+        return NextResponse.json({ ok: true, postId: result.postId, message: "Nuovo post generato." });
+      case "no_active_feeds":
+        return NextResponse.json(
+          { error: "Nessun feed RSS attivo: aggiungine uno in «Feed RSS» prima di generare." },
+          { status: 422 }
+        );
+      case "no_new_articles":
+        return NextResponse.json({ ok: true, message: "Nessun nuovo articolo trovato nei feed attivi." });
     }
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Errore sconosciuto.";
-    return NextResponse.json({ error: `Impossibile contattare n8n: ${message}` }, { status: 502 });
+    const message = err instanceof Error ? err.message : "Errore sconosciuto durante la generazione.";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
-
-  return NextResponse.json({ ok: true });
 }
