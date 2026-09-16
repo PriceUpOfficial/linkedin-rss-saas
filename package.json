@@ -13,8 +13,10 @@
     "@supabase/ssr": "^0.12.7",
     "@supabase/supabase-js": "^2.45.4",
     "next": "15.5.25",
+    "openai": "^7.16.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
+    "rss-parser": "^3.13.0",
     "server-only": "^0.0.1"
   },
   "devDependencies": {

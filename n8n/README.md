@@ -1,4 +1,10 @@
-# Workflow n8n: generazione post da RSS
+# Workflow n8n: generazione post da RSS (legacy, non collegato)
+
+> 📌 **Non più il percorso attivo.** L'app ora fa fetch RSS + generazione
+> testo/immagine **in-process** (`src/lib/generatePost.ts`), senza n8n — vedi
+> il README principale. Questo workflow resta qui solo come riferimento, per
+> un'eventuale futura versione multi-tenant su larga scala dove delegare la
+> generazione a un orchestratore esterno potrebbe tornare utile.
 
 `rss-to-linkedin-generate.json` è l'adattamento del workflow originale
 "Post Linkedin Pietro Tommasi": legge i feed RSS **per utente** da Supabase,

@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
-import { addFeed, deleteFeed, toggleFeed } from "./actions";
+import { deleteFeed, toggleFeed } from "./actions";
+import AddFeedForm from "./add-feed-form";
 
 export default async function FeedsPage() {
   const supabase = await createClient();
@@ -18,26 +19,12 @@ export default async function FeedsPage() {
       <div>
         <h1 className="text-lg font-semibold">Feed RSS</h1>
         <p className="mt-1 text-sm text-gray-500">
-          Aggiungi gli URL dei feed RSS da cui generare i post. Il recupero e la generazione
-          avvengono in un workflow n8n esterno.
+          Scegli una fonte predefinita o incolla un URL RSS/Atom. Il recupero e la generazione
+          avvengono direttamente in questa app.
         </p>
       </div>
 
-      <form action={addFeed} className="flex gap-2">
-        <input
-          type="url"
-          name="url"
-          required
-          placeholder="https://esempio.com/feed.xml"
-          className="block w-full max-w-md rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500"
-        />
-        <button
-          type="submit"
-          className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
-        >
-          Aggiungi feed
-        </button>
-      </form>
+      <AddFeedForm />
 
       <ul className="divide-y divide-gray-200 rounded-md border border-gray-200 bg-white">
         {(feeds ?? []).map((feed) => (

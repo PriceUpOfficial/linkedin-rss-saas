@@ -1,19 +1,21 @@
 # linkedin-rss-saas
 
-App Next.js 14 (App Router) + Supabase + Tailwind: gli utenti accedono via email,
-gestiscono una lista di feed RSS, collegano LinkedIn con un flusso OAuth 2.0
-personalizzato (scope `openid profile w_member_social`) e approvano/scartano i
-post generati da un workflow n8n esterno.
+App Next.js 15 (App Router) + Supabase + Tailwind, tutto in un unico extranet:
+l'utente accede via email, seleziona a menu le proprie fonti RSS, il tono e la
+lingua dei post, quando generarli e se illustrarli, collega LinkedIn con un
+OAuth 2.0 personalizzato, e approva/scarta i post generati.
 
 ## Architettura
 
 - **Auth**: Supabase Auth, accesso via magic link email (nessuna password).
 - **Database**: Supabase Postgres, schema in `supabase/migrations/`, RLS attiva
   su tutte le tabelle.
-- **Fetch RSS + generazione testo**: gestiti interamente da un workflow **n8n
-  esterno**, che legge/scrive su Supabase con la service role key. Questa app
-  non fa parsing di feed né chiamate LLM: si limita a chiamare il webhook n8n
-  (`N8N_GENERATE_WEBHOOK_URL`) quando l'utente clicca "Genera ora".
+- **Fetch RSS + generazione testo/immagine**: eseguiti **in-process da questa
+  stessa app** (`src/lib/generatePost.ts`), niente servizi esterni da
+  orchestrare a mano: `rss-parser` per i feed, l'SDK `openai` per riscrittura,
+  post finale e immagine (`gpt-image-1`), upload su Supabase Storage. Si
+  attiva cliccando "Genera ora" (`/api/generate`) oppure in automatico via
+  cron Vercel (`/api/cron/generate`, orari scelti a menu in Impostazioni).
 - **LinkedIn**: OAuth 2.0 custom (non il provider LinkedIn integrato in
   Supabase, che non permette di richiedere lo scope `w_member_social`).
   Vedi `src/lib/linkedin.ts` e `src/app/api/linkedin/*`.
@@ -22,6 +24,11 @@ post generati da un workflow n8n esterno.
   `POST /rest/images`) usando il token salvato per l'utente, letto
   esclusivamente server-side. Esito: `posted` + `linkedin_post_urn`, oppure
   `failed` + `error_message`. "Scarta" imposta `status = 'rejected'`.
+
+> `n8n/` contiene un adattamento precedente basato su un workflow n8n
+> esterno: non è più il percorso attivo (l'app non lo chiama più), ma resta
+> come riferimento per un'eventuale futura versione multi-tenant su larga
+> scala. Vedi `n8n/README.md`.
 
 ## Struttura del progetto
 
@@ -32,18 +39,24 @@ src/
     auth/callback/route.ts    scambio codice -> sessione Supabase
     api/linkedin/connect/     step 1 OAuth LinkedIn (redirect ad authorize)
     api/linkedin/callback/    step 2 OAuth LinkedIn (scambio code -> token)
-    api/generate/route.ts     chiama il webhook n8n
+    api/generate/route.ts     "Genera ora": esegue la pipeline per l'utente loggato
+    api/cron/generate/route.ts  cron orario: esegue la pipeline per gli utenti in schedule_hours
     dashboard/
-      feeds/                  CRUD feed RSS
+      feeds/                  CRUD feed RSS (con fonti predefinite a menu)
       linkedin/               stato connessione LinkedIn
       posts/                  lista post generati, Genera ora / Approva / Scarta
-      settings/               tono, lingua, post/giorno, istruzioni custom
+      settings/               tono, lingua, orari di generazione, immagine on/off, istruzioni custom
   lib/
     supabase/{server,client,admin}.ts
-    linkedin.ts                helper OAuth + pubblicazione post
+    linkedin.ts                helper OAuth + pubblicazione post (+ upload immagine)
+    rss.ts                     parsing feed RSS/Atom
+    openai.ts                  riscrittura articolo, post finale, prompt e generazione immagine
+    generatePost.ts            orchestrazione dell'intera pipeline di generazione
+    storage.ts                 upload immagine su Supabase Storage
     database.types.ts          tipi TypeScript per le tabelle
 supabase/migrations/           schema SQL (RLS inclusa)
-n8n/                            workflow n8n adattato (fetch RSS + generazione, no publish diretto) e sua guida
+vercel.json                    cron orario per la generazione automatica
+n8n/                            (legacy, non piu' collegato) adattamento su workflow n8n esterno
 ```
 
 ## Setup
@@ -63,18 +76,17 @@ n8n/                            workflow n8n adattato (fetch RSS + generazione, 
    - Redirect URL autorizzato: deve combaciare esattamente con
      `LINKEDIN_REDIRECT_URI` (es. `http://localhost:3000/api/linkedin/callback`).
 
-3. **n8n**
-   - Vedi `n8n/README.md` e `n8n/rss-to-linkedin-generate.json`: workflow
-     pronto da importare che legge `rss_feeds`/`generation_settings` per
-     utente, dedup contro `feed_items`, genera testo + immagine e scrive in
-     `generated_posts` con `status='pending'` (nessuna pubblicazione diretta
-     su LinkedIn). Espone un webhook (`Webhook: Genera Ora`) da collegare a
-     `N8N_GENERATE_WEBHOOK_URL`, oltre a uno Schedule Trigger per la
-     generazione automatica su tutti gli utenti con feed attivi.
+3. **OpenAI**
+   - Crea una API key su [platform.openai.com](https://platform.openai.com/api-keys).
+   - Serve accesso a `gpt-4o` (testo) e `gpt-image-1` (immagini); su un
+     account nuovo potrebbe servire completare la verifica organizzazione
+     per sbloccare `gpt-image-1`.
 
 4. **Variabili d'ambiente**
 
-   Copia `.env.example` in `.env.local` e compila tutti i valori.
+   Copia `.env.example` in `.env.local` e compila tutti i valori (incluso
+   `CRON_SECRET`: una stringa a caso generata da te, va impostata identica
+   anche su Vercel).
 
 5. **Installazione e avvio**
 
@@ -82,6 +94,12 @@ n8n/                            workflow n8n adattato (fetch RSS + generazione, 
    npm install
    npm run dev
    ```
+
+6. **Cron di produzione**: `vercel.json` registra `/api/cron/generate` ogni
+   ora; Vercel invia automaticamente `Authorization: Bearer $CRON_SECRET` se
+   la env var `CRON_SECRET` è impostata sul progetto. Sul piano **Hobby**
+   Vercel limita i cron a 1 esecuzione al giorno: per generare più volte al
+   giorno come da Impostazioni serve il piano **Pro**.
 
 ## Nota sulla versione di Next.js
 
